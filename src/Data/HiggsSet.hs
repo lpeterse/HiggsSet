@@ -203,10 +203,19 @@ resolve    :: forall a i.(Indexable a, Index i, IndexOf a ~ i)
               => Selection i 
               -> HiggsQuery a i (Selection i)
 
+resolve Nothing'
+  = return Nothing'
+
+resolve (Singleton i)
+  = return (Singleton i)
+
 resolve (Set a)            
   = if IS.null a
       then return $ Nothing'
       else return $ Set a
+
+resolve Everything
+  = return Everything
 
 resolve (Range a b)        
   = do ind <- index (unMargin a) <$> ask
