@@ -303,6 +303,12 @@ everything        = return Everything
 equals           :: (Indexable a, Index i, IndexOf a ~ i) => i -> HiggsQuery a i (Selection i)
 equals i          = return $ Range (Closed i) (Closed i)
 
+larger           :: (Indexable a, Index i, IndexOf a ~ i) => i -> HiggsQuery a i (Selection i)
+larger i          = return $ Range (Open i) (Infinite i)
+
+smaller          :: (Indexable a, Index i, IndexOf a ~ i) => i -> HiggsQuery a i (Selection i)
+smaller i         = return $ Range (Infinite i) (Open i)
+
 union            :: HiggsQuery a i (Selection i) -> HiggsQuery a i (Selection i) -> HiggsQuery a i (Selection i)
 union a b         = a >>= \a'-> b >>= \b'-> (return $ Union a' b')
 
