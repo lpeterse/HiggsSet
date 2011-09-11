@@ -13,7 +13,22 @@ Version:             0.1
 Synopsis:            A multi-index set with advanced query capabilites
 
 -- A longer description of the package.
--- Description:         
+Description:         This package allows you to define several typesafe
+                     indizes on a set. You can query the set with an SQL-like
+                     set of query operations.
+                     This package was developed as a successor of 'Data.IxSet'.
+                     It is meant to be more space efficient, since it uses
+                     'Data.IntSet' and 'Data.TrieMap' as an underlying represenation.
+                     It also has the potential to be fast, since indizes don't
+                     need to be recalculated after each query and since
+                     Patricia trees perform quite well for intersection and union.
+
+                     This package comes without warranties. Although I use it
+                     without problems in a large web project it is neither properly 
+                     tested nor benchmarked.
+
+                     Patches or suggestions for improvement are welcome. If you like,
+                     start an issue on github.
 
 -- URL for the project homepage or repository.
 Homepage:            github.com/lpeterse/HiggsSet
@@ -43,15 +58,15 @@ Build-type:          Simple
 -- Extra-source-files:  
 
 -- Constraint on the version of Cabal needed to build this package.
-Cabal-version:       >=1.2
+Cabal-version:       >=1.6
 
 
 Library
   -- Modules exported by the library.
-  ghc-options:         -O2
+  --ghc-options:         -O2
   hs-source-dirs:      src
   Exposed-modules:     Data.HiggsSet
-  Build-depends:       base
+  Build-depends:       base >= 4.2 && < 6
                      , vector     
                      , TrieMap    >= 4.0.1
                      , containers 
@@ -69,4 +84,8 @@ Library
   
   -- Extra tools (e.g. alex, hsc2hs, ...) needed to build the source.
   -- Build-tools:         
-  
+
+source-repository head
+  type:              git
+  location:          git://github.com/lpeterse/HiggsSet.git
+ 
