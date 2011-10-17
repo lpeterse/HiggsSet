@@ -120,15 +120,17 @@ type HiggsQuery e i a = Reader (HiggsSet e i) a
 --
 --   >  instance Indexable Book where
 --   >    type IndexOf Book = BookIndex
---   >    project (IIsbn _)               x = [isbn x]
+--   >    project (IIsbn _)               x = [IIsbn (isbn x)]
 --   >    project (IAuthor _)             x = map IAuthor (toList $ authors x)
---   >    project (IPriceInEuro _)        x = [priceInEuro (price x)]
+--   >    project (IPriceInEuro _)        x = [IPriceInEuro $ priceInEuro (price x)]
 --   >    project (IPublisherAndYear _ _) x = [IPublisherAndYear (publisher x) (year x)]
 --   >    project (INewerThan2000 _)      x = [INewerThan2000 | year x >= 2000] 
 --   >    project (ITitle _)              x = map ITitle $ words $ title x 
 class Indexable a where
   type IndexOf a
   project    :: IndexOf a -> a -> [IndexOf a]
+  share      :: HiggsSet a (IndexOf a) -> a -> a
+  share _ a   = a
 
 -- | The associated index type needs to be an instance of `Index`.
 --   First of all this means that it needs to be an instance of 
@@ -233,27 +235,28 @@ size       = IM.size . elements
 
 -- | Insert an element to an 'HiggsSet'. Indexing takes place according to the class instances defined before. It is not checked whether such an element (according to 'Eq') already exists. If so, the set contains more than once afterwards. In such a case you may rather want to use 'update'.
 insert    :: forall a i.(Indexable a, Index i, IndexOf a ~ i) => a -> HiggsSet a i -> HiggsSet a i
-insert a s = s { elements = IM.insert key a (elements s)
-               , maxKey   = key
-               , indizes  = V.accum 
-                              (foldl' 
-                                (\x y-> case x of
-                                          SingletonMap m -> SingletonMap $ TM.insert y key m
-                                          MultiMap     m -> MultiMap     $ TM.insertWith       
-                                                                             -- unite with elements already existing at index position 
-                                                                             IS.union            
-                                                                             -- the index position "where"
-                                                                             y 
-                                                                             -- the new elements' key is the value of the index map
-                                                                             (IS.singleton key) 
-                                                                             -- the index (TMap i IntSet)
-                                                                             m                  
-                                )
-                              ) 
-                              (indizes s)                     -- the vector
-                              [(fromEnum x, project x a) | x <- [minBound..maxBound :: i]]
-                                                              -- list of index sections with index positions to add
-               }
+insert x s = let a = share s x
+             in  a `seq` s { elements = IM.insert key a (elements s)
+                           , maxKey   = key
+                           , indizes  = V.accum 
+                                          (foldl' 
+                                            (\x y-> case x of
+                                                      SingletonMap m -> SingletonMap $ TM.insert y key m
+                                                      MultiMap     m -> MultiMap     $ TM.insertWith       
+                                                                                         -- unite with elements already existing at index position 
+                                                                                         IS.union            
+                                                                                         -- the index position "where"
+                                                                                         y 
+                                                                                         -- the new elements' key is the value of the index map
+                                                                                         (IS.singleton key) 
+                                                                                         -- the index (TMap i IntSet)
+                                                                                         m                  
+                                            )
+                                          ) 
+                                          (indizes s)                     -- the vector
+                                          [(fromEnum x, project x a) | x <- [minBound..maxBound :: i]]
+                                                                          -- list of index sections with index positions to add
+                           }
              where
                key = succ $ maxKey s
 

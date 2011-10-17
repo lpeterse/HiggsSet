@@ -31,7 +31,7 @@ Description:         This package allows you to define several typesafe
                      start an issue on github.
 
 -- URL for the project homepage or repository.
-Homepage:            github.com/lpeterse/HiggsSet
+Homepage:            http://github.com/lpeterse/HiggsSet
 
 -- The license under which the package is released.
 License:             BSD3
