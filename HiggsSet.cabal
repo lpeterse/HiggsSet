@@ -69,11 +69,12 @@ Library
   Build-depends:       base >= 4.2 && < 6
                      , vector     
                      , TrieMap    >= 4.0.1
-                     , containers 
+                     , containers >= 0.4.2.0
                      , mtl        
                      , deepseq    
                      , bytestring  
                      , text
+                     , th-expand-syns >= 0.3.0.2
 
   
   -- Packages needed in order to build this package.
