@@ -6,16 +6,51 @@ import Language.Haskell.TH.Syntax
 
 import qualified Data.IntMap as IM
 import qualified Data.IntSet as IS
+import qualified Data.Set    as S
 
-class IsHiggsSet a where
+import Data.List (foldl')
+
+class HiggsSet a where
   type ElemOf  a
   empty  :: a
-  toList :: a -> [ElemOf a]
   insert :: ElemOf a -> a -> a
 
-fromList :: (IsHiggsSet a) => [ElemOf a] -> a
-fromList
- = foldl (flip insert) empty
+  toList        :: a -> [ElemOf a]
+  fromSelection :: Selection a -> a
+
+  -- some useful "views" on a selection that are always applicable
+  size   :: Selection a -> Int
+  list   :: Selection a -> [ElemOf a]
+  set    :: Selection a -> S.Set (ElemOf a)
+
+  -- private methods just for use within this module
+  elems :: a -> IM.IntMap (ElemOf a) 
+
+fromList :: (HiggsSet a) => [ElemOf a] -> a
+fromList ls
+ = foldl (flip insert) empty ls
+
+fromList' :: (HiggsSet a) => [ElemOf a] -> a
+fromList' ls
+ = foldl' (flip insert) empty ls
+
+-- applies a filter on HiggsSet
+select :: HiggsSet a => Filter a -> a -> Selection a
+select (ToIntSet f) set -- TODO: ask johann about a specialised intersection intset <-> intmap
+ = let filter key _ = IS.member key (f set)
+       m            = IM.filterWithKey filter (elems set)
+   in  m `seq` Selection (set, m)
+select x set
+ = select (reduce x) set
+ where -- TODO: optimize
+   reduce x@(ToIntSet _)     = x
+   reduce All                = ToIntSet (\s-> IM.keysSet $ elems s)
+   reduce (Complement x)     = let (ToIntSet s) = reduce x -- safe, is a property of reduce
+                               in  ToIntSet $ s `IS.difference` IM.keysSet (elems set) -- s is always a subset of set
+   reduce (Union x y)        = ToIntSet (reduce x `IS.union` reduce y)
+   reduce (Intersection x y) = ToIntSet (reduce x `IS.intersection` reduce y)
+   reduce (Difference x y)   = ToIntSet (reduce x `IS.difference` reduce y)
+
 
 predicateIndex :: ( a -> Bool ) -> IndexDescription a
 predicateIndex p
@@ -28,17 +63,20 @@ data IndexDescription a
      { indexPredicate :: a -> Bool 
      }
 
-
 -- Template Haskell code
 ------------------------
 
+newtype Selection a = Selection (a, IM.IntMap (ElemOf a))
+
 data Filter a
-   = Filter       (a -> IS.IntSet)
+  -- absolute
+   = ToIntSet       (a -> IS.IntSet)
+  -- relative
    | All
    | Complement   (Filter a)
    | Union        (Filter a) (Filter a)
    | Intersection (Filter a) (Filter a)
-   | Without      (Filter a) (Filter a)
+   | Difference   (Filter a) (Filter a)
 
 assert :: (Monad m) => Bool -> String -> m ()
 assert True  _       = return ()
@@ -47,9 +85,7 @@ assert False message = fail message
 createHiggsSet :: String -> Name -> [(String, IndexDescription a)] -> Q [Dec]
 createHiggsSet setTypeString elemTypeName indices
  = do let setTypeName = mkName setTypeString
-      let selectorTypeName = mkName $ setTypeString ++ "Selector"
       conName         <- newName "HiggsSet"
-
       elemsFieldName  <- newName "elements"
       maxKeyFieldName <- newName "maxKey"
 
@@ -78,7 +114,7 @@ createHiggsSet setTypeString elemTypeName indices
                                                    , valD
                                                        (varP $ mkName s)
                                                        ( normalB $
-                                                           conE 'Filter `appE` varE n
+                                                           conE 'ToIntSet `appE` varE n
                                                        ) [] 
                                                    ] 
                                               _ -> [] 
@@ -101,7 +137,7 @@ createHiggsSet setTypeString elemTypeName indices
         <- instanceD
              ( return [] ) -- cxt
              ( appT
-                 ( return $ ConT ''IsHiggsSet ) 
+                 ( return $ ConT ''HiggsSet ) 
                  ( return $ ConT setTypeName )
              )
              [ tySynInstD
@@ -142,6 +178,11 @@ createHiggsSet setTypeString elemTypeName indices
                               ]
                         ) []
                     ]
+             , do valD
+                    (varP $ mkName "elements")
+                    ( normalB $
+                        varE elemsFieldName
+                    ) []
              ]
 
       sequence $
@@ -149,5 +190,3 @@ createHiggsSet setTypeString elemTypeName indices
         , return higgsClassInstance
         ] ++ indexFilterDecls
 
-
--- $(createHiggsSet "SetTypeName" ''Type ['index1, 'index2, 'index3])
